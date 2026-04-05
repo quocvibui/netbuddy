@@ -31,7 +31,24 @@ use crate::llm::LlmEngine;
 use crate::state::{AppState, InsightStatus, ModelStatus, SharedState};
 use crate::store::Store;
 
+/// Intercept SIGABRT and convert to clean exit.  llama.cpp's Metal
+/// device destructor fires ggml_abort during process teardown (any
+/// quit path: Cmd-Q, ESC, window close).  Without this, macOS shows
+/// the "quit unexpectedly" dialog.
+#[cfg(unix)]
+fn install_abort_guard() {
+    extern "C" fn on_abort(_sig: libc::c_int) {
+        unsafe { libc::_exit(0) }
+    }
+    unsafe {
+        libc::signal(libc::SIGABRT, on_abort as libc::sighandler_t);
+    }
+}
+
 fn main() {
+    #[cfg(unix)]
+    install_abort_guard();
+
     // Silence wgpu/hudsucker/rustls noise; only show our own logs.
     tracing_subscriber::fmt()
         .with_env_filter(

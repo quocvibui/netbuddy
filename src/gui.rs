@@ -298,11 +298,13 @@ fn view(app: &App, m: &Model, frame: Frame) {
     // ── Layout: bottom section first to know creature bounds ─────
     let bottom_edge = -panel_h / 2.0 + UI_PX * 3.0;
 
-    // Key hints — single row at very bottom
+    // Key hints — bottom row
     let hint_cy = bottom_edge + TEXT_PX_SM * 3.0;
-    let auto_tag = if st.auto_response { "A:ON" } else { "A:OFF" };
-    let hints = format!("ESC  F  {auto_tag}");
-    bitmap_font::draw_text_centered(&draw, &hints, 0.0, hint_cy, TEXT_PX_SM, COL_BLACK);
+    let left_hint_x = -panel_w / 2.0 + UI_PX * 4.0;
+    let right_hint_x = panel_w / 2.0 - UI_PX * 4.0;
+    bitmap_font::draw_text(&draw, "ESC:QUIT  F:FULL", left_hint_x, hint_cy, TEXT_PX_SM, COL_BLACK);
+    let auto_tag = if st.auto_response { "A:AUTO" } else { "A:OFF" };
+    bitmap_font::draw_text_right(&draw, auto_tag, right_hint_x, hint_cy, TEXT_PX_SM, COL_BLACK);
 
     // Ask button — just above ESC
     let btn_h = UI_PX * 6.0;
