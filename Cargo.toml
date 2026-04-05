@@ -1,0 +1,55 @@
+[package]
+name = "netmind"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+# Enable CUDA GPU acceleration (Linux/Windows with NVIDIA GPU)
+cuda = ["llama-cpp-2/cuda"]
+
+[dependencies]
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# Proxy
+hudsucker = { version = "0.24.0", features = ["rcgen-ca", "rustls-client", "decoder"] }
+http-body-util = "0.1"
+hyper = { version = "1", features = ["full"] }
+
+# Model download
+hf-hub = { version = "0.5", features = ["tokio"] }
+
+# UTF-8 streaming decoder (for llama.cpp token output)
+encoding_rs = "0.8"
+
+# Storage
+sled = "0.34"
+
+# GUI
+nannou = "0.19.0"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+hostname = "0.4"
+whoami = "1"
+rand = "0.8"
+
+# ── LLM inference via llama.cpp ────────────��─────────────────────────
+# Metal is auto-enabled on macOS — no feature flag needed.
+# For CUDA: cargo build --release --features cuda
+[target.'cfg(target_os = "macos")'.dependencies]
+llama-cpp-2 = { version = "0.1", features = ["metal"] }
+cocoa = "0.25"
+objc = "0.2"
+raw-window-handle = "0.5"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+llama-cpp-2 = { version = "0.1" }
