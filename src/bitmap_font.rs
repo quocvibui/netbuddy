@@ -8,7 +8,7 @@ use nannou::prelude::*;
 /// packed into a u16 (bit 14 = top-left, bit 0 = bottom-right).
 /// Row order: top to bottom. Bit order within row: left to right.
 const GLYPH_W: i32 = 3;
-const GLYPH_H: i32 = 5;
+pub const GLYPH_H: i32 = 5;
 
 /// Spacing between characters in grid cells.
 const CHAR_SPACING: i32 = 1;
