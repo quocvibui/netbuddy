@@ -75,10 +75,19 @@ fn main() {
 
     gui::run_gui(state, insight_rx, trigger_tx);
 
-    // Force-exit after the GUI closes.  Without this, llama.cpp's Metal
-    // resource destructors run during process teardown and crash, causing
-    // macOS's "quit unexpectedly" dialog.  exit(0) is clean and skips
-    // destructor ordering issues with the background tokio thread.
+    // Hard-exit after the GUI closes.  llama.cpp registers a global Metal
+    // device whose C++ destructor crashes during normal process teardown
+    // (ggml_metal_device_free → ggml_abort).  std::process::exit() still
+    // runs __cxa_finalize / atexit handlers, so it crashes too.
+    //
+    // _exit() is the POSIX immediate-terminate syscall — no atexit, no
+    // C++ destructors, no flush.  This is the only way to avoid the
+    // macOS "quit unexpectedly" dialog.
+    #[cfg(unix)]
+    unsafe {
+        libc::_exit(0);
+    }
+    #[cfg(not(unix))]
     std::process::exit(0);
 }
 
