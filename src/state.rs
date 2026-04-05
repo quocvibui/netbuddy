@@ -34,6 +34,10 @@ pub struct AppState {
     pub insight_status: InsightStatus,
     pub last_insight_time: Option<u64>,
 
+    // ── Config (runtime-togglable) ─────────────────────────────────────
+    pub auto_response: bool,
+    pub auto_response_interval: u64,
+
     // ── Reactive metrics (feed the creature animation) ───────────────
     pub total_requests: u64,
     pub total_bytes: u64,
@@ -117,6 +121,8 @@ impl Default for AppState {
             model_status: ModelStatus::Loading,
             insight_status: InsightStatus::Idle,
             last_insight_time: None,
+            auto_response: true,
+            auto_response_interval: 30,
             total_requests: 0,
             total_bytes: 0,
             recent_request_timestamps: Vec::new(),

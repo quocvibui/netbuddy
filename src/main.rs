@@ -7,10 +7,12 @@
 //!
 //! Boot sequence:
 //!   1. Init logging (all crates silenced except `netmind`)
-//!   2. Spawn tokio thread → proxy, model loader, store ingestion, insight timer
-//!   3. Run nannou GUI on main thread (required by macOS/wgpu)
+//!   2. Load config from `netmind.toml`
+//!   3. Spawn tokio thread → proxy, model loader, store ingestion, insight timer
+//!   4. Run nannou GUI on main thread (required by macOS/wgpu)
 
 mod bitmap_font;
+mod config;
 mod creature;
 mod gui;
 mod insights;
@@ -24,6 +26,7 @@ use std::time::Duration;
 
 use tracing::info;
 
+use crate::config::Config;
 use crate::llm::LlmEngine;
 use crate::state::{AppState, InsightStatus, ModelStatus, SharedState};
 use crate::store::Store;
@@ -41,7 +44,16 @@ fn main() {
         )
         .init();
 
+    let config = Config::load();
+    info!("config: auto_response={}, interval={}s", config.auto_response, config.auto_response_interval);
+
     let state: SharedState = Arc::new(Mutex::new(AppState::default()));
+    {
+        let mut st = state.lock().unwrap();
+        st.auto_response = config.auto_response;
+        st.auto_response_interval = config.auto_response_interval;
+    }
+
     let llm: Arc<Mutex<Option<LlmEngine>>> = Arc::new(Mutex::new(None));
 
     // std::sync::mpsc channels bridge tokio ↔ nannou (can't use tokio::mpsc
@@ -51,16 +63,23 @@ fn main() {
 
     let bg_state = state.clone();
     let bg_llm = llm.clone();
+    let bg_config = config;
 
     // tokio runtime must live on a background thread — nannou owns main.
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
         rt.block_on(async move {
-            run_backend(bg_state, bg_llm, insight_tx, trigger_rx).await;
+            run_backend(bg_state, bg_llm, insight_tx, trigger_rx, bg_config).await;
         });
     });
 
     gui::run_gui(state, insight_rx, trigger_tx);
+
+    // Force-exit after the GUI closes.  Without this, llama.cpp's Metal
+    // resource destructors run during process teardown and crash, causing
+    // macOS's "quit unexpectedly" dialog.  exit(0) is clean and skips
+    // destructor ordering issues with the background tokio thread.
+    std::process::exit(0);
 }
 
 /// Drives all async subsystems: proxy, model, store, and insight timer.
@@ -69,6 +88,7 @@ async fn run_backend(
     llm: Arc<Mutex<Option<LlmEngine>>>,
     insight_tx: mpsc::Sender<String>,
     trigger_rx: mpsc::Receiver<()>,
+    config: Config,
 ) {
     let store = Store::open().expect("failed to open sled database");
 
@@ -91,7 +111,6 @@ async fn run_backend(
     });
 
     // ── Model loader ─────────────────────────────────────────────────
-    // Downloads weights on first run (~350 MB), then loads from cache.
     let model_state = state.clone();
     let model_llm = llm.clone();
     tokio::spawn(async move {
@@ -117,7 +136,6 @@ async fn run_backend(
     });
 
     // ── Store ingestion ──────────────────────────────────────────────
-    // Receives intercepted pages from proxy, persists to sled, updates stats.
     let ingest_store = store.clone();
     let ingest_state = state.clone();
     tokio::spawn(async move {
@@ -142,22 +160,43 @@ async fn run_backend(
     });
 
     // ── Insight timer ────────────────────────────────────────────────
-    // Auto-generates every 30 min.  Also fires on-demand when the user
-    // clicks "ask buddy" (polled via std::sync::mpsc at 50ms intervals
-    // because tokio::select! can't await a std channel directly).
-    let mut interval = tokio::time::interval(Duration::from_secs(1800));
-    interval.tick().await; // discard the immediate first tick
+    // Checks every second: if auto_response is on and enough time has
+    // elapsed, generates a new insight.  Also polls the ASK button
+    // trigger channel for on-demand generation.
+    let interval_secs = config.auto_response_interval.max(5); // minimum 5s
 
     loop {
-        tokio::select! {
-            _ = interval.tick() => {
-                try_generate_insight(&store, &llm, &state, &insight_tx).await;
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Check for manual ASK button trigger
+        if trigger_rx.try_recv().is_ok() {
+            try_generate_insight(&store, &llm, &state, &insight_tx).await;
+            continue;
+        }
+
+        // Check for auto-response timer
+        let should_auto = {
+            let st = state.lock().unwrap();
+            if !st.auto_response {
+                continue;
             }
-            _ = tokio::time::sleep(Duration::from_millis(50)) => {
-                if trigger_rx.try_recv().is_ok() {
-                    try_generate_insight(&store, &llm, &state, &insight_tx).await;
+            if st.insight_status == InsightStatus::Generating {
+                continue;
+            }
+            match st.last_insight_time {
+                Some(last) => {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    now.saturating_sub(last) >= interval_secs
                 }
+                None => true, // No insight yet — generate one
             }
+        };
+
+        if should_auto {
+            try_generate_insight(&store, &llm, &state, &insight_tx).await;
         }
     }
 }

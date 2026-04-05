@@ -122,8 +122,21 @@ fn fix_macos_transparency(app: &App, window_id: nannou::window::Id) {
 #[cfg(not(target_os = "macos"))]
 fn fix_macos_transparency(_app: &App, _window_id: nannou::window::Id) {}
 
-fn key_pressed(app: &App, _m: &mut Model, key: Key) {
-    if matches!(key, Key::Escape | Key::Q) { app.quit(); }
+fn key_pressed(app: &App, m: &mut Model, key: Key) {
+    match key {
+        Key::Escape => app.quit(),
+        Key::F => {
+            let win = app.main_window();
+            win.set_fullscreen(!win.is_fullscreen());
+        }
+        Key::A => {
+            // Toggle auto-response on/off
+            if let Ok(mut st) = m.state.lock() {
+                st.auto_response = !st.auto_response;
+            }
+        }
+        _ => {}
+    }
 }
 
 fn update(_app: &App, m: &mut Model, upd: Update) {
@@ -285,14 +298,16 @@ fn view(app: &App, m: &Model, frame: Frame) {
     // ── Layout: bottom section first to know creature bounds ─────
     let bottom_edge = -panel_h / 2.0 + UI_PX * 3.0;
 
-    // ESC hint — very bottom
-    let esc_cy = bottom_edge + TEXT_PX_SM * 3.0;
-    bitmap_font::draw_text_centered(&draw, "ESC", 0.0, esc_cy, TEXT_PX_SM, COL_BLACK);
+    // Key hints — very bottom
+    let hint_cy = bottom_edge + TEXT_PX_SM * 3.0;
+    let auto_label = if st.auto_response { "A:AUTO" } else { "A:OFF" };
+    bitmap_font::draw_text(&draw, "ESC  F", -panel_w / 2.0 + UI_PX * 4.0, hint_cy, TEXT_PX_SM, COL_BLACK);
+    bitmap_font::draw_text_right(&draw, auto_label, panel_w / 2.0 - UI_PX * 4.0, hint_cy, TEXT_PX_SM, COL_BLACK);
 
     // Ask button — just above ESC
     let btn_h = UI_PX * 6.0;
     let btn_w = UI_PX * 18.0;
-    let btn_cy = esc_cy + TEXT_PX_SM * 5.0 + UI_PX * 1.0 + btn_h / 2.0;
+    let btn_cy = hint_cy + TEXT_PX_SM * 5.0 + UI_PX * 1.0 + btn_h / 2.0;
 
     let is_gen = st.insight_status == InsightStatus::Generating;
     ui_rect(&draw, 0.0, btn_cy, btn_w, btn_h, COL_BLACK);
@@ -366,9 +381,9 @@ fn mouse_pressed(app: &App, m: &mut Model, _button: MouseButton) {
     let win = app.window_rect();
     let panel_h = win.h();
     let bottom_edge = -panel_h / 2.0 + UI_PX * 3.0;
-    let esc_cy = bottom_edge + TEXT_PX_SM * 3.0;
+    let hint_cy = bottom_edge + TEXT_PX_SM * 3.0;
     let btn_h = UI_PX * 6.0;
-    let btn_cy = esc_cy + TEXT_PX_SM * 5.0 + UI_PX * 1.0 + btn_h / 2.0;
+    let btn_cy = hint_cy + TEXT_PX_SM * 5.0 + UI_PX * 1.0 + btn_h / 2.0;
     let btn_w = UI_PX * 18.0;
     let btn = geom::Rect::from_x_y_w_h(0.0, btn_cy, btn_w, btn_h);
     if btn.contains(mouse) {
