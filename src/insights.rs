@@ -13,8 +13,16 @@ use tracing::info;
 use crate::llm::LlmEngine;
 use crate::store::Store;
 
+/// How many recent pages to include in the LLM prompt.  8 gives enough
+/// context to notice browsing patterns without blowing up the prompt.
 const RECENT_ENTRIES: usize = 8;
+
+/// Max chars kept per page snippet.  120 chars captures the gist of a
+/// page title + opening paragraph — enough for the LLM to react to.
 const SNIPPET_CHARS: usize = 120;
+
+/// Token budget for each LLM response.  40 tokens ≈ one short sentence,
+/// which keeps the speech bubble readable and inference fast (~0.15 s).
 const MAX_TOKENS: usize = 40;
 
 /// Pull recent pages from the store, build a context prompt, and ask

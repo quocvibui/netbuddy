@@ -38,6 +38,10 @@ pub struct AppState {
     pub auto_response: bool,
     pub auto_response_interval: u64,
 
+    // ── Diagnostics ──────────────────────────────────────────────────
+    /// Pages dropped because the ingestion channel was full (backpressure).
+    pub dropped_pages: u64,
+
     // ── Reactive metrics (feed the creature animation) ───────────────
     pub total_requests: u64,
     pub total_bytes: u64,
@@ -123,6 +127,7 @@ impl Default for AppState {
             last_insight_time: None,
             auto_response: true,
             auto_response_interval: 30,
+            dropped_pages: 0,
             total_requests: 0,
             total_bytes: 0,
             recent_request_timestamps: Vec::new(),

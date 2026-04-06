@@ -5,17 +5,12 @@
 //! DNA-driven uniqueness ensures every machine gets a distinct creature.
 
 use nannou::prelude::*;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
 use crate::gui::{COL_BLACK, COL_WHITE};
 
 // ── DNA: unique identity per machine ─────────────────────────────────
 
 pub struct CreatureDna {
     seed: u64,
-    #[allow(dead_code)]
-    pub body_roundness: f32,
     pub body_squish: f32,
     pub ear_style: u8,       // 0..5 (none, round, pointy, antenna, floppy, horns)
     pub eye_size: f32,
@@ -31,24 +26,31 @@ pub struct CreatureDna {
     pub head_bump: f32,      // 0..1 — how pronounced the head bump is
 }
 
+/// Set to `true` during development to get a random creature each launch.
+const DEV_RANDOM_CREATURE: bool = false;
+
 impl CreatureDna {
     pub fn from_machine() -> Self {
-        // TODO: restore machine-unique seed for release
-        // let mut data = String::new();
-        // data.push_str(&hostname::get().unwrap_or_default().to_string_lossy());
-        // data.push_str(&whoami::username());
-        // let mut h = DefaultHasher::new();
-        // data.hash(&mut h);
-        // Self::from_seed(h.finish())
+        if DEV_RANDOM_CREATURE {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            let seed = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos() as u64;
+            eprintln!("creature seed: {seed}");
+            return Self::from_seed(seed);
+        }
 
-        // Temporary: random seed each launch to preview different designs
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
-        eprintln!("creature seed: {seed}");
-        Self::from_seed(seed)
+        let mut data = String::new();
+        data.push_str(&hostname::get().unwrap_or_default().to_string_lossy());
+        data.push_str(&whoami::username());
+        // FNV-1a: deterministic across builds (DefaultHasher is not).
+        let mut h: u64 = 0xcbf29ce484222325;
+        for b in data.as_bytes() {
+            h ^= *b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        Self::from_seed(h)
     }
 
     fn from_seed(seed: u64) -> Self {
@@ -60,7 +62,6 @@ impl CreatureDna {
         };
         Self {
             seed,
-            body_roundness: f(0, 0.6, 1.0),
             body_squish: f(8, 0.75, 1.0),
             ear_style: b(16, 6),
             eye_size: f(20, 0.12, 0.22),
@@ -79,9 +80,12 @@ impl CreatureDna {
 
     /// Deterministic pseudo-random float [0,1) from DNA + index.
     fn r(&self, idx: usize) -> f32 {
-        let mut h = DefaultHasher::new();
-        (self.seed, idx).hash(&mut h);
-        (h.finish() & 0xFFFF) as f32 / 65535.0
+        // splitmix64 — deterministic across builds.
+        let mut z = self.seed.wrapping_add((idx as u64).wrapping_mul(0x9e3779b97f4a7c15));
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+        z ^= z >> 31;
+        (z & 0xFFFF) as f32 / 65535.0
     }
 }
 

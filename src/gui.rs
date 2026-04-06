@@ -339,12 +339,15 @@ fn view(app: &App, m: &Model, frame: Frame) {
         _ => ". . .".to_string(),
     };
 
-    // Dynamic font sizing: shorter text gets bigger font
+    // Scale font to fill the speech area regardless of message length.
+    // Thresholds tuned so ~2 lines of text fill the bubble at each size.
     let char_count = speech_text.len();
-    let font_size = if char_count < 40 { 24.0 }
-        else if char_count < 80 { 20.0 }
-        else if char_count < 120 { 16.0 }
-        else { 14.0 };
+    let font_size: f32 = match char_count {
+        0..40   => 24.0, // short quip — large and punchy
+        40..80  => 20.0, // one-liner — comfortable reading size
+        80..120 => 16.0, // longer thought — compact but legible
+        _       => 14.0, // verbose — smallest we go before clipping
+    };
 
     draw.text(&speech_text)
         .font(m.vt323_font.clone())

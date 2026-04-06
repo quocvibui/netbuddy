@@ -24,6 +24,7 @@ use hudsucker::{
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
+use crate::state::SharedState;
 use crate::store::PageEntry;
 
 const CERT_PATH: &str = "certs/ca.crt";
@@ -36,6 +37,7 @@ const BODY_TRUNCATE_CHARS: usize = 2000;   // store at most 2000 chars per page
 #[derive(Clone)]
 struct ProxyHandler {
     entry_tx: mpsc::Sender<PageEntry>,
+    state: SharedState,
     current_uri: Option<String>,
 }
 
@@ -129,9 +131,13 @@ impl HttpHandler for ProxyHandler {
             };
 
             // Non-blocking send; if the channel is full we drop the entry
-            // rather than stalling the proxy pipeline.
+            // rather than stalling the proxy pipeline.  Dropped pages are
+            // counted so the UI/logs can surface backpressure issues.
             if let Err(e) = entry_tx.try_send(entry) {
-                warn!("failed to send page entry: {e}");
+                warn!("dropped page (channel full): {e}");
+                if let Ok(mut st) = self.state.lock() {
+                    st.dropped_pages += 1;
+                }
             }
 
             Response::from_parts(parts, Body::from(Full::new(bytes)))
@@ -187,9 +193,15 @@ pub async fn start_proxy(
     state: crate::state::SharedState,
 ) -> Result<()> {
     let issuer = load_or_generate_ca()?;
+    warn!(
+        "MITM proxy uses a self-signed CA ({}). \
+         Keep certs/ private — anyone with ca.key can intercept your traffic.",
+        CERT_PATH,
+    );
 
     let handler = ProxyHandler {
         entry_tx,
+        state: state.clone(),
         current_uri: None,
     };
 
