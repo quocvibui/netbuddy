@@ -1,4 +1,4 @@
-//! Config file support — reads `netmind.toml` from the working directory.
+//! Config file support — reads `netbuddy.toml` from the working directory.
 //!
 //! If the file doesn't exist, defaults are used and a template is written
 //! so users know what's configurable.
@@ -7,7 +7,7 @@ use serde::Deserialize;
 use std::path::Path;
 use tracing::info;
 
-const CONFIG_PATH: &str = "netmind.toml";
+const CONFIG_PATH: &str = "netbuddy.toml";
 
 /// All user-configurable settings.  Missing fields get defaults via serde.
 #[derive(Debug, Clone, Deserialize)]
@@ -35,13 +35,13 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Load config from `netmind.toml`.  If the file doesn't exist, write
+    /// Load config from `netbuddy.toml`.  If the file doesn't exist, write
     /// a default template and return defaults.
     pub fn load() -> Self {
         let path = Path::new(CONFIG_PATH);
 
         if !path.exists() {
-            let template = r#"# netmind configuration
+            let template = r#"# netbuddy configuration
 # Edit this file and relaunch to apply changes.
 
 # Auto-generate messages on a timer (true/false)

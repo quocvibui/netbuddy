@@ -1,4 +1,6 @@
 /target
+netbuddy_data/
 netmind_data/
 certs/
+netbuddy.toml
 netmind.toml

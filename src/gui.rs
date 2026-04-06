@@ -60,7 +60,7 @@ fn model_fn(app: &App) -> Model {
         .size(WIN_SIZE, WIN_SIZE)
         .decorations(false)
         .transparent(true)
-        .title("netmind")
+        .title("netbuddy")
         .view(view)
         .key_pressed(key_pressed)
         .mouse_pressed(mouse_pressed)

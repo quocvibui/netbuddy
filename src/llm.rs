@@ -55,17 +55,6 @@ impl LlmEngine {
         Ok(Self { backend, model })
     }
 
-    /// Human-readable device name for diagnostics.
-    pub fn device_name(&self) -> &'static str {
-        if cfg!(target_os = "macos") {
-            "Metal (auto)"
-        } else if cfg!(feature = "cuda") {
-            "CUDA"
-        } else {
-            "CPU"
-        }
-    }
-
     /// Run one inference pass.  Creates a fresh context (KV cache) each
     /// time so calls are independent.
     pub fn infer(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {

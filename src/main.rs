@@ -1,13 +1,13 @@
 #![allow(unexpected_cfgs)]
-//! netmind — always-on browsing companion.
+//! netbuddy — always-on browsing companion.
 //!
 //! Architecture: nannou GUI on the main thread, tokio runtime on a
 //! background thread.  The two sides communicate through std::sync::mpsc
 //! channels because nannou's model callback is !Send.
 //!
 //! Boot sequence:
-//!   1. Init logging (all crates silenced except `netmind`)
-//!   2. Load config from `netmind.toml`
+//!   1. Init logging (all crates silenced except `netbuddy`)
+//!   2. Load config from `netbuddy.toml`
 //!   3. Spawn tokio thread → proxy, model loader, store ingestion, insight timer
 //!   4. Run nannou GUI on main thread (required by macOS/wgpu)
 
@@ -41,7 +41,25 @@ fn install_abort_guard() {
         unsafe { libc::_exit(0) }
     }
     unsafe {
-        libc::signal(libc::SIGABRT, on_abort as libc::sighandler_t);
+        libc::signal(libc::SIGABRT, on_abort as *const () as libc::sighandler_t);
+    }
+}
+
+/// Register an `atexit` handler that calls `_exit(0)`.
+///
+/// Must be called **after** llama.cpp initializes its Metal device
+/// (i.e. after model load) so that our handler sits later in the LIFO
+/// `atexit` chain and runs *before* the Metal device destructor.
+/// This prevents the destructor from ever executing, avoiding the
+/// `ggml_metal_device_free → ggml_abort` crash when nannou/winit
+/// calls `std::process::exit()` on window close.
+#[cfg(unix)]
+fn install_exit_guard() {
+    extern "C" fn on_exit() {
+        unsafe { libc::_exit(0) }
+    }
+    unsafe {
+        libc::atexit(on_exit);
     }
 }
 
@@ -54,7 +72,7 @@ fn main() {
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| {
-                    "off,netmind=info"
+                    "off,netbuddy=info"
                         .parse()
                         .unwrap()
                 }),
@@ -146,6 +164,11 @@ async fn run_backend(
             Ok(Ok(engine)) => {
                 *model_llm.lock().unwrap() = Some(engine);
                 model_state.lock().unwrap().model_status = ModelStatus::Ready;
+                // Register atexit guard now that the Metal device exists.
+                // Our handler is LIFO-after the device destructor, so it
+                // runs first and calls _exit(0) before the destructor can.
+                #[cfg(unix)]
+                install_exit_guard();
                 info!("model loaded successfully");
             }
             Ok(Err(e)) => {

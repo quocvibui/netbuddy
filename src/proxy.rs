@@ -158,10 +158,10 @@ fn load_or_generate_ca() -> Result<Issuer<'static, KeyPair>> {
     params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
     params
         .distinguished_name
-        .push(rcgen::DnType::CommonName, "netmind CA");
+        .push(rcgen::DnType::CommonName, "netbuddy CA");
     params
         .distinguished_name
-        .push(rcgen::DnType::OrganizationName, "netmind");
+        .push(rcgen::DnType::OrganizationName, "netbuddy");
 
     let key_pair = KeyPair::generate()?;
     let cert = params.self_signed(&key_pair)?;

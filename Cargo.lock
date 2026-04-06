@@ -2477,7 +2477,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "netmind"
+name = "netbuddy"
 version = "0.1.0"
 dependencies = [
  "anyhow",

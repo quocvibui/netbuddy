@@ -27,9 +27,9 @@ pub struct Store {
 }
 
 impl Store {
-    /// Open (or create) the database in `./netmind_data/`.
+    /// Open (or create) the database in `./netbuddy_data/`.
     pub fn open() -> Result<Self> {
-        let db = sled::open("netmind_data")?;
+        let db = sled::open("netbuddy_data")?;
         info!("opened sled db with {} entries", db.len());
         Ok(Self { db })
     }
