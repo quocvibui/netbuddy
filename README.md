@@ -1,5 +1,9 @@
 ### netbuddy — your browsing buddy
 
+<p align="center">
+  <img src="image.png" alt="netbuddy screenshot" width="480">
+</p>
+
 A desktop pixel creature that watches your browsing and comments on what you're
 up to. Runs a local LLM (Qwen3.5-0.8B) fully offline — no API keys needed.
 
